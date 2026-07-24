@@ -1,0 +1,44 @@
+name: E4 - Full Pipeline (npm audit + njsscan + Trivy)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests
+        run: npm test
+
+      - name: Dependency scan (npm audit)
+        run: npm audit --audit-level=none || true
+
+      - name: SAST scan (njsscan)
+        run: |
+          echo "=== SAST SCAN START ==="
+          pip install njsscan
+          njsscan --exit-warning src/ || true
+          echo "=== SAST SCAN END ==="
+
+      - name: Build Docker image
+        run: docker build -t devsecops-node:latest .
+
+      - name: Container scan (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devsecops-node:latest
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
